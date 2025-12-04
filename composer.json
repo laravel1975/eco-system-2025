@@ -54,7 +54,8 @@
             "TmrEcosystem\\Customers\\": "src/Customers/",
             "TmrEcosystem\\Logistics\\": "src/Logistics/",
             "TmrEcosystem\\Communication\\": "src/Communication/",
-            "TmrEcosystem\\Shared\\": "src/Shared/"
+            "TmrEcosystem\\Shared\\": "src/Shared/",
+            "TmrEcosystem\\Approval\\": "src/Approval/"
         }
     },
     "autoload-dev": {

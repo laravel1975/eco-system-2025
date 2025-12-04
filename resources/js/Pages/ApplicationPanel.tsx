@@ -41,6 +41,12 @@ const allApps: AppItemProps[] = [
         Icon: Users,
         colorClasses: 'bg-orange-500 text-white',
     },
+    {
+        href: route('approval.index'),
+        label: 'Approval',
+        Icon: Users,
+        colorClasses: 'bg-yellow-500 text-white',
+    },
 
     // --- Group 2: Core Operation (งานหลัก) ---
     {
