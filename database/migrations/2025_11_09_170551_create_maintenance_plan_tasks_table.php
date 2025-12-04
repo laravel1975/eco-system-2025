@@ -1,0 +1,30 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('maintenance_plan_tasks', function (Blueprint $table) {
+            $table->id();
+
+            $table->foreignId('maintenance_plan_id')
+                  ->constrained('maintenance_plans')
+                  ->onDelete('cascade'); // (ลบ Task เมื่อ Plan ถูกลบ)
+
+            $table->string('task_name');
+            $table->text('description')->nullable();
+            $table->integer('sort_order')->default(0);
+
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('maintenance_plan_tasks');
+    }
+};

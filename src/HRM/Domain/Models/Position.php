@@ -1,0 +1,37 @@
+<?php
+
+namespace TmrEcosystem\HRM\Domain\Models;
+
+use App\Models\Company;
+use App\Models\Scopes\CompanyScope; // <-- ใช้ Scope ที่คุณสร้างไว้
+use Illuminate\Database\Eloquent\Model;
+
+class Position extends Model
+{
+    protected $fillable = ['title',
+        'description',
+        'department_id',
+        'company_id',
+    ];
+
+    // (สำคัญ) ใช้ Global Scope ของคุณ
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new CompanyScope);
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
+    }
+
+    public function employees()
+    {
+        return $this->hasMany(EmployeeProfile::class);
+    }
+}
