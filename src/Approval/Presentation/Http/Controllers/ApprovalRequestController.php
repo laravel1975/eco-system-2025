@@ -13,25 +13,54 @@ use TmrEcosystem\Approval\Domain\Enums\ApprovalStatus;
 
 class ApprovalRequestController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        // 1. ดึงรายการที่สถานะ Pending (ในอนาคตค่อยกรองตาม Role ของคน Login)
-        //$approvals = ApprovalRequest::query()
-        //    ->with(['workflow', 'requester']) // Eager Load ข้อมูลที่ต้องใช้แสดง
-        //    ->where('status', 'pending')
-        //    ->orderBy('created_at', 'desc')
-        //    ->paginate(10);
+        $user = Auth::user();
 
-        // เพิ่ม 'currentStep' เข้าไปใน with()
-        $approvals = ApprovalRequest::query()
-            ->with(['workflow', 'requester', 'currentStep']) // <--- เพิ่มตรงนี้
-            ->where('status', 'pending')
-            ->orderBy('created_at', 'desc')
-            ->paginate(10);
+        // 1. รับค่า Filter
+        $search = $request->input('search');
+        $status = $request->input('status', 'pending'); // Default เป็น pending (งานค้าง)
 
-        // 2. ส่งข้อมูลไปที่หน้าเว็บ (React)
+        // 2. Query หลัก
+        $query = ApprovalRequest::query()
+            ->with(['workflow', 'requester', 'currentStep']);
+
+        // 3. Apply Filters
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('document_number', 'like', "%{$search}%")
+                    ->orWhere('subject_id', 'like', "%{$search}%")
+                    ->orWhereHas('requester', function ($subQ) use ($search) {
+                        $subQ->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        if ($status && $status !== 'all') {
+            $query->where('status', $status);
+        }
+
+        // 4. Pagination
+        $approvals = $query->orderBy('created_at', 'desc')->paginate(10);
+
+        // 5. คำนวณ Stats (KPIs)
+        $stats = [
+            'total_pending' => ApprovalRequest::where('status', 'pending')->count(),
+            'my_tasks'      => ApprovalRequest::where('status', 'pending')
+                ->whereHas('currentStep', function ($q) {
+                    // TODO: กรองตาม Role ของ User จริงๆ
+                    // $q->whereIn('approver_role', Auth::user()->getRoleNames());
+                })->count(),
+            'completed'     => ApprovalRequest::whereIn('status', ['approved', 'rejected'])->count()
+        ];
+
         return Inertia::render('Approval/Index', [
-            'approvals' => $approvals
+            'approvals' => $approvals,
+            'filters'   => [
+                'search' => $search,
+                'status' => $status,
+            ],
+            'stats'     => $stats
         ]);
     }
 
@@ -66,7 +95,6 @@ class ApprovalRequestController extends Controller
 
             // ส่งข้อความกลับไปบอก Frontend
             return redirect()->back()->with('success', $message);
-
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'เกิดข้อผิดพลาด: ' . $e->getMessage());
         }

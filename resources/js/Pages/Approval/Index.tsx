@@ -1,211 +1,404 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
+import { Head, Link, router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, useForm, router } from '@inertiajs/react';
-import { Button } from "@/Components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/Components/ui/card";
-import { Badge } from "@/Components/ui/badge";
-import { Textarea } from "@/Components/ui/textarea";
-import { CheckCircle, XCircle, FileText, Clock, AlertCircle } from 'lucide-react';
-import { PageProps } from '@/types'; // หรือ path ที่คุณเก็บ types หลักไว้
-import ApprovalsNavigationMenu from './Partials/ApprovalsNavigationMenu';
+import { debounce } from 'lodash';
+import {
+    Search, Box, ArrowRight, Eye, UserCheck,
+    RefreshCw, CheckCircle2, Clock, User, XCircle, FileText, AlertCircle
+} from "lucide-react";
 
-// --- Types Definition ---
+// Components (ShadCN)
+import { Input } from "@/Components/ui/input";
+import { Button } from "@/Components/ui/button";
+import { Badge } from "@/Components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/Components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/Components/ui/table";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/Components/ui/tabs";
+import { Textarea } from "@/Components/ui/textarea"; // เพิ่ม Textarea
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/Components/ui/alert-dialog";
+import { cn } from '@/lib/utils';
+
+// --- Interfaces ---
 interface ApprovalStep {
     order: number;
     approver_role: string;
 }
 
-interface Workflow {
-    name: string;
-}
-
-interface Requester {
-    name: string;
-}
-
-interface ApprovalItem {
+interface ApprovalRequest {
     id: string;
     document_number?: string;
     subject_id: string;
     status: string;
     created_at: string;
-    workflow: Workflow;
-    requester: Requester;
+    workflow: { name: string };
+    requester: { name: string };
     current_step?: ApprovalStep;
     current_step_order: number;
 }
 
-interface Props extends PageProps {
+interface Props {
+    auth: any;
     approvals: {
-        data: ApprovalItem[];
-        links: any[]; // สำหรับ Pagination
+        data: ApprovalRequest[];
+        links: any[];
+        current_page: number;
+        last_page: number;
+        total: number;
+        from: number;
+        to: number;
+    };
+    filters: {
+        search: string;
+        status: string;
+    };
+    stats: {
+        total_pending: number;
+        my_tasks: number;
+        completed: number;
     };
 }
 
-// --- Main Component ---
-export default function ApprovalIndex({ auth, approvals }: Props) {
-    // ใช้ useForm ของ Inertia เพื่อจัดการ State และ Post Data
-    const { data, setData, post, processing, reset } = useForm({
-        request_id: '',
-        action: '',
-        comment: ''
-    });
+export default function ApprovalIndex({ auth, approvals, filters, stats }: Props) {
+    const [search, setSearch] = useState(filters.search || '');
+    const [currentStatus, setCurrentStatus] = useState(filters.status || 'pending');
 
-    // State สำหรับควบคุมว่าจะเปิดกล่อง Comment ของ ID ไหน
-    const [selectedId, setSelectedId] = useState<string | null>(null);
+    // State สำหรับ Modal Action
+    const [selectedRequest, setSelectedRequest] = useState<ApprovalRequest | null>(null);
+    const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
+    const [comment, setComment] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
-    // ฟังก์ชันยิง Action ไปที่ Controller
-    const handleAction = (id: string, action: 'approve' | 'reject') => {
-        const actionLabel = action === 'approve' ? 'อนุมัติ' : 'ไม่อนุมัติ / ตีกลับ';
+    // --- Handlers ---
 
-        // 1. Confirm ก่อนทำรายการ
-        if (!confirm(`ยืนยันการ ${actionLabel} รายการนี้?`)) return;
+    const debouncedSearch = useCallback(
+        debounce((query: string, status: string) => {
+            router.get(
+                route('approval.index'),
+                {
+                    search: query,
+                    status: status === 'all' ? undefined : status
+                },
+                { preserveState: true, replace: true, onStart: () => setIsLoading(true), onFinish: () => setIsLoading(false) }
+            );
+        }, 400), []
+    );
 
-        // 2. ใช้ router.post แทน useForm.post
-        // เพื่อให้เราสามารถ custom data payload (id, action) ผสมกับ state (comment) ได้อิสระ
-        router.post(route('approval.action'), {
-            // --- Payload (ข้อมูลที่จะส่งไป Controller) ---
-            request_id: id,
-            action: action,
-            comment: data.comment // ดึง comment จาก state ของฟอร์ม
-        }, {
-            // --- Options (การจัดการหน้าเว็บหลังส่ง) ---
-            preserveScroll: true, // ไม่ต้องเลื่อนหน้าจอกลับไปบนสุด
-            onSuccess: () => {
-                reset(); // ล้างช่อง comment
-                setSelectedId(null); // ปิดกล่อง input
+    const handleSearchChange = (val: string) => {
+        setSearch(val);
+        debouncedSearch(val, currentStatus);
+    };
+
+    const handleTabChange = (val: string) => {
+        setCurrentStatus(val);
+        router.get(
+            route('approval.index'),
+            {
+                search,
+                status: val === 'all' ? undefined : val
             },
-            onFinish: () => {
-                // (Optional) โค้ดที่จะรันเมื่อ process เสร็จไม่ว่าจะ success หรือ error
-            }
+            { preserveState: true, replace: true, onStart: () => setIsLoading(true), onFinish: () => setIsLoading(false) }
+        );
+    };
+
+    // เปิด Modal
+    const openActionDialog = (item: ApprovalRequest, type: 'approve' | 'reject') => {
+        setSelectedRequest(item);
+        setActionType(type);
+        setComment('');
+    };
+
+    // ยืนยันการทำรายการ (Approve/Reject)
+    const confirmAction = () => {
+        if (!selectedRequest || !actionType) return;
+
+        router.post(route('approval.action'), {
+            request_id: selectedRequest.id,
+            action: actionType,
+            comment: comment
+        }, {
+            onSuccess: () => {
+                setSelectedRequest(null);
+                setActionType(null);
+                setComment('');
+            },
+            preserveScroll: true
         });
     };
 
+    // --- Helpers ---
+
+    const getStatusBadge = (status: string, currentStep?: ApprovalStep) => {
+        switch (status) {
+            case 'pending':
+                return (
+                    <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 gap-1 font-normal">
+                        <Clock className="w-3 h-3"/>
+                        {currentStep ? `Wait: ${currentStep.approver_role}` : 'Pending'}
+                    </Badge>
+                );
+            case 'approved':
+                return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1"><CheckCircle2 className="w-3 h-3"/> Approved</Badge>;
+            case 'rejected':
+                return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 gap-1"><XCircle className="w-3 h-3"/> Rejected</Badge>;
+            default:
+                return <Badge variant="secondary">{status}</Badge>;
+        }
+    };
+
+    const getInitials = (name: string) => name ? name.substring(0, 2).toUpperCase() : 'NA';
+
     return (
-        <AuthenticatedLayout user={auth.user} navigationMenu={<ApprovalsNavigationMenu/>}>
-            <Head title="รายการรออนุมัติ" />
+        <AuthenticatedLayout user={auth.user}>
+            <Head title="Approval Workflow" />
 
-            <div className="py-12">
-                <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            <div className="py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
 
-                    <Card className="shadow-sm border-t-4 border-t-blue-600">
-                        <CardHeader className="border-b bg-gray-50/50">
-                            <CardTitle className="flex items-center gap-2 text-xl text-gray-800">
-                                <FileText className="w-5 h-5 text-blue-600" />
-                                รายการที่ต้องตรวจสอบ (Pending Tasks)
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-0">
-                            <div className="divide-y divide-gray-100">
-                                {approvals.data.length === 0 ? (
-                                    // --- กรณีไม่มีงานค้าง ---
-                                    <div className="flex flex-col items-center justify-center py-16 text-gray-500">
-                                        <CheckCircle className="w-12 h-12 text-green-100 mb-4" />
-                                        <p className="text-lg font-medium">ไม่มีรายการค้างอนุมัติ</p>
-                                        <p className="text-sm">งานทั้งหมดเรียบร้อยดี!</p>
-                                    </div>
-                                ) : (
-                                    // --- Loop แสดงรายการ ---
-                                    approvals.data.map((item) => (
-                                        <div key={item.id} className="p-6 hover:bg-slate-50 transition-colors duration-150">
-                                            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-
-                                                {/* ส่วนแสดงข้อมูลด้านซ้าย */}
-                                                <div className="flex-1 space-y-3">
-                                                    <div className="flex items-center flex-wrap gap-2">
-                                                        <Badge variant="outline" className="font-mono text-blue-700 bg-blue-50 border-blue-200">
-                                                            {item.workflow?.name}
-                                                        </Badge>
-
-                                                        {/* เลขที่เอกสาร */}
-                                                        <span className="font-bold text-lg text-gray-900">
-                                                            {item.document_number || item.subject_id}
-                                                        </span>
-
-                                                        {/* 🔥 Badge แสดงสถานะ: รอใครอยู่? */}
-                                                        {item.status === 'pending' && item.current_step && (
-                                                            <Badge className="bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-100 flex items-center gap-1 shadow-sm">
-                                                                <Clock className="w-3 h-3" />
-                                                                รอ: {item.current_step.approver_role} (Step {item.current_step.order})
-                                                            </Badge>
-                                                        )}
-                                                    </div>
-
-                                                    <div className="text-sm text-gray-600 grid grid-cols-1 md:grid-cols-2 gap-2">
-                                                        <p className="flex items-center gap-2">
-                                                            <span className="text-gray-400 min-w-[60px]">ผู้ร้องขอ:</span>
-                                                            <span className="font-medium text-gray-900">{item.requester?.name || 'N/A'}</span>
-                                                        </p>
-                                                        <p className="flex items-center gap-2">
-                                                            <span className="text-gray-400 min-w-[60px]">ส่งเมื่อ:</span>
-                                                            <span>{new Date(item.created_at).toLocaleString('th-TH')}</span>
-                                                        </p>
-                                                    </div>
-
-                                                    {/* กล่องใส่ Comment (จะโชว์เมื่อกดปุ่มตรวจสอบ) */}
-                                                    {selectedId === item.id && (
-                                                        <div className="mt-4 p-4 bg-white border border-blue-100 rounded-lg shadow-sm animate-in fade-in slide-in-from-top-2">
-                                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                                ความคิดเห็น / เหตุผลประกอบ (ถ้ามี)
-                                                            </label>
-                                                            <Textarea
-                                                                placeholder="เช่น อนุมัติเบิกจ่ายได้ทันที, เอกสารไม่ครบ..."
-                                                                className="min-h-[80px] mb-3 focus-visible:ring-blue-500"
-                                                                value={data.comment}
-                                                                onChange={e => setData('comment', e.target.value)}
-                                                            />
-                                                            <div className="flex gap-3 justify-end items-center">
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    onClick={() => setSelectedId(null)}
-                                                                    disabled={processing}
-                                                                >
-                                                                    ยกเลิก
-                                                                </Button>
-                                                                <Button
-                                                                    variant="destructive"
-                                                                    onClick={() => handleAction(item.id, 'reject')}
-                                                                    disabled={processing}
-                                                                >
-                                                                    <XCircle className="w-4 h-4 mr-2" />
-                                                                    ไม่อนุมัติ
-                                                                </Button>
-                                                                <Button
-                                                                    className="bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg transition-all"
-                                                                    onClick={() => handleAction(item.id, 'approve')}
-                                                                    disabled={processing}
-                                                                >
-                                                                    <CheckCircle className="w-4 h-4 mr-2" />
-                                                                    ยืนยันอนุมัติ
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* ปุ่ม Action ด้านขวา (ซ่อนเมื่อเปิดกล่อง Comment แล้ว) */}
-                                                {selectedId !== item.id && (
-                                                    <div className="flex items-center">
-                                                        <Button
-                                                            variant="default"
-                                                            className="w-full md:w-auto shadow-sm"
-                                                            onClick={() => {
-                                                                setSelectedId(item.id);
-                                                                setData('comment', ''); // เคลียร์ comment เก่า
-                                                            }}
-                                                        >
-                                                            ตรวจสอบ / อนุมัติ
-                                                        </Button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
+                {/* --- Header Stats --- */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Card 1: Pending Total */}
+                    <Card className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white border-none shadow-md">
+                        <CardContent className="p-6 flex justify-between items-center">
+                            <div>
+                                <p className="text-indigo-100 text-sm font-medium mb-1">Total Pending</p>
+                                <h3 className="text-3xl font-bold">{stats.total_pending}</h3>
                             </div>
+                            <div className="p-3 bg-white/20 rounded-full"><Clock className="w-6 h-6 text-white" /></div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Card 2: My Tasks */}
+                    <Card className="border-none shadow-sm bg-white border-l-4 border-l-orange-400">
+                        <CardContent className="p-6 flex justify-between items-center">
+                            <div>
+                                <p className="text-muted-foreground text-sm font-medium mb-1">My Tasks</p>
+                                <h3 className="text-3xl font-bold text-gray-800">{stats.my_tasks}</h3>
+                            </div>
+                            <div className="p-3 bg-orange-50 rounded-full"><AlertCircle className="w-6 h-6 text-orange-500" /></div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Card 3: Completed */}
+                    <Card className="border-none shadow-sm bg-white">
+                        <CardContent className="p-6 flex justify-between items-center">
+                            <div>
+                                <p className="text-muted-foreground text-sm font-medium mb-1">Completed</p>
+                                <h3 className="text-3xl font-bold text-gray-800">{stats.completed}</h3>
+                            </div>
+                            <div className="p-3 bg-green-50 rounded-full"><CheckCircle2 className="w-6 h-6 text-green-600" /></div>
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* --- Main Content --- */}
+                <Card className="shadow-sm border-gray-200">
+                    <CardHeader className="px-6 py-4 border-b flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div>
+                            <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                                <FileText className="w-6 h-6 text-blue-600" />
+                                Approval Requests
+                                {isLoading && <RefreshCw className="w-4 h-4 animate-spin text-gray-400" />}
+                            </CardTitle>
+                            <p className="text-sm text-muted-foreground mt-1">Manage documents requiring your approval.</p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <div className="relative w-full sm:w-64">
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+                                <Input
+                                    placeholder="Search Doc #, Requester..."
+                                    className="pl-9 bg-white"
+                                    value={search}
+                                    onChange={e => handleSearchChange(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                    </CardHeader>
+
+                    <div className="p-0">
+                        <Tabs value={currentStatus} onValueChange={handleTabChange} className="w-full">
+                            <div className="px-6 pt-4 pb-0 border-b">
+                                <TabsList className="bg-transparent p-0 h-auto space-x-6">
+                                    {['pending', 'approved', 'rejected', 'all'].map((tab) => (
+                                        <TabsTrigger
+                                            key={tab}
+                                            value={tab}
+                                            className="data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 data-[state=active]:shadow-none rounded-none px-2 py-3 text-gray-500 hover:text-gray-700 capitalize bg-transparent"
+                                        >
+                                            {tab}
+                                        </TabsTrigger>
+                                    ))}
+                                </TabsList>
+                            </div>
+
+                            <TabsContent value={currentStatus} className="m-0">
+                                <div className="overflow-x-auto">
+                                    <Table>
+                                        <TableHeader className="bg-gray-50/50">
+                                            <TableRow>
+                                                <TableHead className="pl-6">Doc Number</TableHead>
+                                                <TableHead>Workflow / Type</TableHead>
+                                                <TableHead>Requester</TableHead>
+                                                <TableHead className="text-center">Step</TableHead>
+                                                <TableHead>Current Assignee</TableHead>
+                                                <TableHead>Date</TableHead>
+                                                <TableHead>Status</TableHead>
+                                                <TableHead className="text-right pr-6">Action</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {approvals.data.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={8} className="h-48 text-center text-gray-500">
+                                                        <div className="flex flex-col items-center justify-center gap-2">
+                                                            <CheckCircle2 className="w-10 h-10 text-green-100" />
+                                                            <p>No approval requests found.</p>
+                                                            <p className="text-sm">You are all caught up!</p>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                approvals.data.map((item) => (
+                                                    <TableRow key={item.id} className="hover:bg-gray-50/60 transition-colors group">
+                                                        <TableCell className="pl-6 font-medium font-mono text-blue-600">
+                                                            {item.document_number || item.subject_id}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge variant="outline" className="bg-white">
+                                                                {item.workflow?.name}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-500">
+                                                                    {getInitials(item.requester?.name)}
+                                                                </div>
+                                                                <span className="text-sm font-medium text-gray-700">
+                                                                    {item.requester?.name}
+                                                                </span>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-center font-mono text-xs">
+                                                            {item.current_step_order}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {item.status === 'pending' && item.current_step ? (
+                                                                <span className="text-sm text-orange-600 font-medium">
+                                                                    {item.current_step.approver_role}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-xs text-gray-400 italic">-</span>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="text-gray-500 text-xs">
+                                                            {new Date(item.created_at).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute:'2-digit'})}
+                                                        </TableCell>
+                                                        <TableCell>{getStatusBadge(item.status, item.current_step)}</TableCell>
+                                                        <TableCell className="text-right pr-6">
+                                                            {item.status === 'pending' && (
+                                                                <div className="flex justify-end gap-2">
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        className="text-red-600 border-red-200 hover:bg-red-50 h-8"
+                                                                        onClick={() => openActionDialog(item, 'reject')}
+                                                                    >
+                                                                        Reject
+                                                                    </Button>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        className="bg-green-600 hover:bg-green-700 text-white h-8 shadow-sm"
+                                                                        onClick={() => openActionDialog(item, 'approve')}
+                                                                    >
+                                                                        Approve
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+                                                            {item.status !== 'pending' && (
+                                                                <Button size="sm" variant="ghost" className="text-gray-500 hover:text-gray-900 h-8">
+                                                                    <Eye className="w-4 h-4" />
+                                                                </Button>
+                                                            )}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </TabsContent>
+                        </Tabs>
+
+                        {/* --- Pagination --- */}
+                        <div className="p-4 border-t bg-gray-50 flex items-center justify-between">
+                            <div className="text-xs text-gray-500">
+                                Showing {approvals.from || 0}-{approvals.to || 0} of {approvals.total}
+                            </div>
+                            <div className="flex gap-1">
+                                {approvals.links.map((link: any, index: number) => (
+                                    <Button
+                                        key={index}
+                                        variant={link.active ? "default" : "outline"}
+                                        size="sm"
+                                        className={cn("h-8 px-3", !link.url && "opacity-50 cursor-not-allowed")}
+                                        asChild={!!link.url}
+                                        disabled={!link.url}
+                                    >
+                                        {link.url ? (
+                                            <Link href={link.url} dangerouslySetInnerHTML={{ __html: link.label }} />
+                                        ) : (
+                                            <span dangerouslySetInnerHTML={{ __html: link.label }} />
+                                        )}
+                                    </Button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </Card>
+
+                {/* --- Action Dialog (Approve/Reject) --- */}
+                <AlertDialog open={!!selectedRequest} onOpenChange={(open) => !open && setSelectedRequest(null)}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle className={`flex items-center gap-2 ${actionType === 'approve' ? 'text-green-700' : 'text-red-700'}`}>
+                                {actionType === 'approve' ? <CheckCircle2 className="w-6 h-6"/> : <XCircle className="w-6 h-6"/>}
+                                {actionType === 'approve' ? 'Confirm Approval' : 'Reject Request'}
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                                คุณกำลังจะทำการ <strong>{actionType === 'approve' ? 'อนุมัติ' : 'ปฏิเสธ'}</strong> เอกสารหมายเลข <span className="font-bold text-black">{selectedRequest?.document_number || selectedRequest?.subject_id}</span>
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+
+                        <div className="py-2">
+                            <label className="text-sm font-medium text-gray-700 mb-1 block">Comment / Remark (Optional)</label>
+                            <Textarea
+                                value={comment}
+                                onChange={e => setComment(e.target.value)}
+                                placeholder={actionType === 'approve' ? "ระบุเหตุผลการอนุมัติ..." : "ระบุสาเหตุที่ปฏิเสธ..."}
+                                className={actionType === 'reject' ? 'border-red-200 focus:ring-red-500' : ''}
+                            />
+                        </div>
+
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={confirmAction}
+                                className={actionType === 'approve' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
+                            >
+                                Confirm {actionType === 'approve' ? 'Approval' : 'Rejection'}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+
             </div>
         </AuthenticatedLayout>
     );
