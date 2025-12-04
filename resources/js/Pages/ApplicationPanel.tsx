@@ -12,9 +12,9 @@ import {
     Package,           // (Inventory) - เปลี่ยนจาก Boxes ให้ดูคลีนขึ้น
     ShoppingCart,      // (Purchase)
     TrendingUp,        // (Sales)
-    Warehouse,         // (Warehouses) - ใช้ไอคอน Warehouse โดยตรง
     Settings,
-    Truck,          // (Settings)
+    Truck,
+    VerifiedIcon,          // (Settings)
 } from 'lucide-react';
 
 import { Card } from "@/Components/ui/card";
@@ -44,7 +44,7 @@ const allApps: AppItemProps[] = [
     {
         href: route('approval.index'),
         label: 'Approval',
-        Icon: Users,
+        Icon: VerifiedIcon,
         colorClasses: 'bg-yellow-500 text-white',
     },
 

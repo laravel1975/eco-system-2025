@@ -64,15 +64,17 @@ export default function SalesNavigationMenu() {
                     </DropdownMenuContent>
                 </DropdownMenu>
 
-                <NavLink
-                    href={route('sales.approvals.index')}
-                    active={route().current('sales.approvals.index')}
-                >
-                    <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4" />
-                        <span>Approval Tasks</span>
-                    </div>
-                </NavLink>
+                <NavigationMenuItem>
+                    <Link
+                        href={route('sales.approvals.index')}
+                        className={cn(
+                            navigationMenuTriggerStyle(),
+                            route().current('sales.approvals.index') ? 'bg-accent text-accent-foreground' : ''
+                        )}
+                    >
+                        Approval Tasks
+                    </Link>
+                </NavigationMenuItem>
 
             </NavigationMenuList>
         </NavigationMenu>

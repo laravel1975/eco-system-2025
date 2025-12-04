@@ -36,6 +36,7 @@ import {
 } from "@/Components/ui/select"
 import { cn } from '@/lib/utils';
 import SalesNavigationMenu from '@/Pages/Sales/Partials/SalesNavigationMenu'; // เมนูของ Sales
+import CreateSalesRequestModal from '../Partials/CreateSalesRequestModal';
 
 // --- Interfaces ---
 interface ApprovalStep {
@@ -270,7 +271,9 @@ export default function SalesApprovalIndex({ auth, approvals, filters, stats }: 
                             <Button variant="outline" size="icon">
                                 <Filter className="h-4 w-4 text-gray-500" />
                             </Button>
+                            <CreateSalesRequestModal />
                         </div>
+
                     </CardHeader>
 
                     <div className="p-0">

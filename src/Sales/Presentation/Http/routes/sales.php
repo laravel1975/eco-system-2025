@@ -24,3 +24,4 @@ Route::delete('/orders/{id}', [OrderController::class, 'destroy'])->name('orders
 Route::get('/orders/{id}/pdf', [OrderPdfController::class, 'download'])->name('orders.pdf');
 
 Route::get('/approvals', [SalesApprovalController::class, 'index'])->name('approvals.index');
+Route::post('/approvals', [SalesApprovalController::class, 'store'])->name('approvals.store');

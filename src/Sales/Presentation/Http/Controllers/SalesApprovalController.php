@@ -18,6 +18,42 @@ class SalesApprovalController extends Controller
         protected SubmitRequestUseCase $submitService
     ) {}
 
+    public function store(Request $request, SubmitRequestUseCase $submitService)
+    {
+        $request->validate([
+            'workflow_code' => 'required|string',
+            'subject_id' => 'required|string', // ในที่นี้รับเป็น String (เลขที่เอกสาร) ไปก่อน
+            'payload' => 'array',
+            'remark' => 'nullable|string'
+        ]);
+
+        try {
+            // Tip: ในระบบจริง คุณควร Query หา ID จริงจาก subject_id (เช่น หา Order ID จาก 'SO-2025-001')
+            // แต่เพื่อความยืดหยุ่นใน Demo นี้ เราจะใช้ subject_id เป็น Text ไปตรงๆ หรือ Mock UUID
+
+            $docId = $request->subject_id;
+
+            // ถ้าเป็นระบบจริงควรทำแบบนี้:
+            // if ($request->workflow_code === 'SALES_DISCOUNT_APPROVE') {
+            //    $order = Order::where('order_number', $request->subject_id)->firstOrFail();
+            //    $docId = $order->id;
+            //    $docType = Order::class;
+            // }
+
+            $submitService->handle(
+                workflowCode: $request->workflow_code,
+                subjectType: 'ManualRequest', // หรือใส่ Class จริงถ้าหาเจอ
+                subjectId: $docId,
+                requesterId: Auth::id(),
+                payload: array_merge($request->payload ?? [], ['remark' => $request->remark]) // รวม Payload + Remark
+            );
+
+            return back()->with('success', 'สร้างคำขออนุมัติเรียบร้อยแล้ว');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Error: ' . $e->getMessage());
+        }
+    }
+
     // รายชื่อ Workflow Code ทั้ง 15 ข้อของฝ่ายขาย
     const SALES_WORKFLOW_CODES = [
         'SALES_PRICE_APPROVE',

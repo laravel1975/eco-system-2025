@@ -12,8 +12,10 @@ class ApprovalRequest extends Model
     use HasUuids;
 
     protected $guarded = [];
+
     protected $casts = [
         'status' => ApprovalStatus::class,
+        'payload_snapshot' => 'array',
     ];
 
     // 2. แก้ไขชื่อ Class ในความสัมพันธ์

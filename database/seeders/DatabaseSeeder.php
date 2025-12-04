@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use TmrEcosystem\Approval\Infrastructure\Database\Seeders\SalesWorkflowSeeder;
 use TmrEcosystem\Customers\Infrastructure\Database\Seeders\CustomerSeeder;
 use TmrEcosystem\Stock\Infrastructure\Persistence\Database\Seeders\StockSeeder;
 
@@ -37,7 +38,8 @@ class DatabaseSeeder extends Seeder
             CustomerSeeder::class,
             VehicleSeeder::class,
             StockSeeder::class,
-            ProductSeeder::class
+            ProductSeeder::class,
+            SalesWorkflowSeeder::class
         ]);
     }
 }

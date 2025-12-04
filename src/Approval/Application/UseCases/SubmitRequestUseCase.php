@@ -11,12 +11,11 @@ class SubmitRequestUseCase
     public function handle(
         string $workflowCode,
         string $subjectType,
-        string $subjectId, // รับเป็น String เพื่อรองรับ UUID
-        int|string $requesterId, // รับเป็น String ได้เผื่อ User UUID
-        array $payload = [] // ข้อมูลสำหรับเช็คเงื่อนไข เช่น amount, department
+        string $subjectId,
+        int|string $requesterId,
+        array $payload = []
     ): ApprovalRequest {
 
-        // 1. หา Workflow Template ที่ Active อยู่
         $workflow = ApprovalWorkflow::where('code', $workflowCode)
             ->where('is_active', true)
             ->first();
@@ -25,8 +24,7 @@ class SubmitRequestUseCase
             throw new Exception("Workflow definition '{$workflowCode}' not found or inactive.");
         }
 
-        // 2. สร้าง Request ใหม่
-        // หมายเหตุ: current_step_order เริ่มที่ 1 เสมอ (หรือจะเขียน Logic ข้าม Step แรกที่นี่ก็ได้)
+        // ✅ แก้ไขตรงนี้: เพิ่ม payload_snapshot ลงไปใน array create
         $request = ApprovalRequest::create([
             'workflow_id' => $workflow->id,
             'requester_id' => $requesterId,
@@ -34,7 +32,7 @@ class SubmitRequestUseCase
             'subject_id' => $subjectId,
             'status' => 'pending',
             'current_step_order' => 1,
-            // ในอนาคตคุณอาจเพิ่ม field 'payload_snapshot' ใน migration เพื่อเก็บ $payload ไว้ดูย้อนหลัง
+            'payload_snapshot' => $payload, // <--- บันทึก Payload จริงลง DB
         ]);
 
         return $request;
