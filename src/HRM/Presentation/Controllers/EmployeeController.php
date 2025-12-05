@@ -7,6 +7,7 @@ use App\Models\Company; // (Shared Kernel)
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 use TmrEcosystem\HRM\Domain\Events\EmployeeRateUpdated;
@@ -136,40 +137,64 @@ class EmployeeController extends Controller
     {
         $validated = $request->validated();
 
-        // (Logic การจัดการ company_id และ user_id - เหมือนเดิม)
+        // ---------------------------------------------------------
+        // ✅ 1. ส่วนที่เพิ่มใหม่: จัดการไฟล์ลายเซ็น (Signature Handling)
+        // ---------------------------------------------------------
+        if ($request->hasFile('signature_path')) {
+            // 1.1 ลบรูปเก่าทิ้ง (ถ้ามี) เพื่อไม่ให้รก Server
+            if ($employee->signature_path) {
+                Storage::disk('public')->delete($employee->signature_path);
+            }
+
+            // 1.2 บันทึกรูปใหม่ลง storage/app/public/signatures
+            $path = $request->file('signature_path')->store('signatures', 'public');
+
+            // 1.3 เอา path ใส่กลับเข้าไปใน array ที่จะ update
+            $validated['signature_path'] = $path;
+        }
+
+        // ---------------------------------------------------------
+        // 2. Logic เดิม: จัดการ company_id และ user_id
+        // ---------------------------------------------------------
         if (!auth()->user()->hasRole('Super Admin')) {
             $validated['company_id'] = $employee->company_id;
         }
+
         if (empty($validated['user_id']) || $validated['user_id'] === 'no_user_link') {
             $validated['user_id'] = null;
         }
 
-        // (2. ทำการอัปเดตข้อมูล)
+        // ---------------------------------------------------------
+        // 3. ทำการอัปเดตข้อมูล (Update)
+        // ---------------------------------------------------------
         $employee->update($validated);
 
-        // (3. [ใหม่] ตรวจสอบว่า 'hourly_rate' ถูกเปลี่ยนหรือไม่)
-        // (เราต้องแน่ใจว่า UpdateEmployeeRequest ของคุณมี 'hourly_rate' ใน rules)
+        // ---------------------------------------------------------
+        // 4. Logic เดิม: ตรวจสอบ Hourly Rate สำหรับ Maintenance
+        // ---------------------------------------------------------
         if ($employee->wasChanged('hourly_rate')) {
-
             $employee->load('department');
 
-            // (1. [Logic ข้อ 1] ตรวจสอบว่าเป็นแผนก Maintenance หรือไม่)
+            // ตรวจสอบว่าเป็นแผนก Maintenance หรือไม่
             if ($employee->department && $employee->department->name === 'Maintenance') {
-
-                // (ถ้าใช่ -> ตะโกนบอก Maintenance)
+                // ตะโกนบอก Maintenance Context
                 event(EmployeeRateUpdated::fromProfile($employee));
             }
         }
 
-        // (ตรวจสอบว่าควรกลับไปหน้า Index หรือ Edit)
+        // ---------------------------------------------------------
+        // 5. Logic เดิม: Maintenance Sync & Redirect Strategy
+        // ---------------------------------------------------------
+
+        // สั่งให้ Maintenance Sync ข้อมูลทันที
+        Artisan::call('maintenance:sync-technicians');
+
+        // ตรวจสอบว่าควรกลับไปหน้า Index หรือ Edit
         $redirectRoute = $request->input('origin') === 'edit_page'
             ? route('hrm.employees.edit', $employee->id)
             : route('hrm.employees.index');
 
-        // (สั่งให้ Maintenance Sync ข้อมูลทันที)
-        Artisan::call('maintenance:sync-technicians');
-
-        return redirect($redirectRoute)->with('success', 'Employee updated.');
+        return redirect($redirectRoute)->with('success', 'Employee updated successfully.');
     }
 
     /**

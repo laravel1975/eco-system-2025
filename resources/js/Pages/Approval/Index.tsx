@@ -1,10 +1,11 @@
 import React, { useState, useCallback } from 'react';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react'; // ✅ อย่าลืม import Link
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { debounce } from 'lodash';
 import {
-    Search, Box, ArrowRight, Eye, UserCheck,
-    RefreshCw, CheckCircle2, Clock, User, XCircle, FileText, AlertCircle
+    Search, FileText, CheckCircle2, XCircle,
+    Clock, AlertCircle, Filter, RefreshCw,
+    Eye
 } from "lucide-react";
 
 // Components (ShadCN)
@@ -14,7 +15,7 @@ import { Badge } from "@/Components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/Components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/Components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/Components/ui/tabs";
-import { Textarea } from "@/Components/ui/textarea"; // เพิ่ม Textarea
+import { Textarea } from "@/Components/ui/textarea";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -26,7 +27,7 @@ import {
     AlertDialogTitle,
 } from "@/Components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
-import ApprovalsNavigationMenu from './Partials/ApprovalsNavigationMenu';
+// import ApprovalsNavigationMenu from './Partials/ApprovalsNavigationMenu'; // ถ้ามีเมนูแยก
 
 // --- Interfaces ---
 interface ApprovalStep {
@@ -83,7 +84,7 @@ export default function ApprovalIndex({ auth, approvals, filters, stats }: Props
     const debouncedSearch = useCallback(
         debounce((query: string, status: string) => {
             router.get(
-                route('approval.index'),
+                route('approval.index'), // ตรวจสอบ route name ให้ตรงกับ web.php
                 {
                     search: query,
                     status: status === 'all' ? undefined : status
@@ -142,14 +143,14 @@ export default function ApprovalIndex({ auth, approvals, filters, stats }: Props
             case 'pending':
                 return (
                     <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 gap-1 font-normal">
-                        <Clock className="w-3 h-3" />
+                        <Clock className="w-3 h-3"/>
                         {currentStep ? `Wait: ${currentStep.approver_role}` : 'Pending'}
                     </Badge>
                 );
             case 'approved':
-                return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1"><CheckCircle2 className="w-3 h-3" /> Approved</Badge>;
+                return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1"><CheckCircle2 className="w-3 h-3"/> Approved</Badge>;
             case 'rejected':
-                return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 gap-1"><XCircle className="w-3 h-3" /> Rejected</Badge>;
+                return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 gap-1"><XCircle className="w-3 h-3"/> Rejected</Badge>;
             default:
                 return <Badge variant="secondary">{status}</Badge>;
         }
@@ -158,7 +159,7 @@ export default function ApprovalIndex({ auth, approvals, filters, stats }: Props
     const getInitials = (name: string) => name ? name.substring(0, 2).toUpperCase() : 'NA';
 
     return (
-        <AuthenticatedLayout user={auth.user} navigationMenu={<ApprovalsNavigationMenu />}>
+        <AuthenticatedLayout user={auth.user}>
             <Head title="Approval Workflow" />
 
             <div className="py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
@@ -269,8 +270,14 @@ export default function ApprovalIndex({ auth, approvals, filters, stats }: Props
                                             ) : (
                                                 approvals.data.map((item) => (
                                                     <TableRow key={item.id} className="hover:bg-gray-50/60 transition-colors group">
-                                                        <TableCell className="pl-6 font-medium font-mono text-blue-600">
-                                                            {item.document_number || item.subject_id}
+                                                        {/* ✅ แก้ไขตรงนี้: ครอบด้วย Link ไปยังหน้า Show */}
+                                                        <TableCell className="pl-6 font-medium">
+                                                            <Link
+                                                                href={route('approval.show', item.id)}
+                                                                className="font-mono text-blue-600 hover:text-blue-800 hover:underline"
+                                                            >
+                                                                {item.document_number || item.subject_id}
+                                                            </Link>
                                                         </TableCell>
                                                         <TableCell>
                                                             <Badge variant="outline" className="bg-white">
@@ -300,7 +307,7 @@ export default function ApprovalIndex({ auth, approvals, filters, stats }: Props
                                                             )}
                                                         </TableCell>
                                                         <TableCell className="text-gray-500 text-xs">
-                                                            {new Date(item.created_at).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                            {new Date(item.created_at).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute:'2-digit'})}
                                                         </TableCell>
                                                         <TableCell>{getStatusBadge(item.status, item.current_step)}</TableCell>
                                                         <TableCell className="text-right pr-6">
@@ -323,10 +330,13 @@ export default function ApprovalIndex({ auth, approvals, filters, stats }: Props
                                                                     </Button>
                                                                 </div>
                                                             )}
+                                                            {/* เปลี่ยนปุ่ม Eye เป็น Link ด้วยก็ได้ */}
                                                             {item.status !== 'pending' && (
-                                                                <Button size="sm" variant="ghost" className="text-gray-500 hover:text-gray-900 h-8">
-                                                                    <Eye className="w-4 h-4" />
-                                                                </Button>
+                                                                <Link href={route('approval.show', item.id)}>
+                                                                    <Button size="sm" variant="ghost" className="text-gray-500 hover:text-gray-900 h-8">
+                                                                        <Eye className="w-4 h-4" />
+                                                                    </Button>
+                                                                </Link>
                                                             )}
                                                         </TableCell>
                                                     </TableRow>
@@ -370,7 +380,7 @@ export default function ApprovalIndex({ auth, approvals, filters, stats }: Props
                     <AlertDialogContent>
                         <AlertDialogHeader>
                             <AlertDialogTitle className={`flex items-center gap-2 ${actionType === 'approve' ? 'text-green-700' : 'text-red-700'}`}>
-                                {actionType === 'approve' ? <CheckCircle2 className="w-6 h-6" /> : <XCircle className="w-6 h-6" />}
+                                {actionType === 'approve' ? <CheckCircle2 className="w-6 h-6"/> : <XCircle className="w-6 h-6"/>}
                                 {actionType === 'approve' ? 'Confirm Approval' : 'Reject Request'}
                             </AlertDialogTitle>
                             <AlertDialogDescription>

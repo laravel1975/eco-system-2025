@@ -8,12 +8,11 @@ use TmrEcosystem\Approval\Presentation\Http\Controllers\ApprovalRequestControlle
 Route::group(['middleware' => ['web', 'auth']], function () {
 
     // หน้า Dashboard รายการอนุมัติ
-    Route::get('/approvals', [ApprovalRequestController::class, 'index'])
-        ->name('approval.index');
+    Route::get('/approvals', [ApprovalRequestController::class, 'index'])->name('approval.index');
+    Route::get('/requests/{id}', [ApprovalRequestController::class, 'show'])->name('approval.show');
 
     // ปุ่มกด Action (Approve/Reject)
-    Route::post('/approvals/action', [ApprovalRequestController::class, 'action'])
-        ->name('approval.action');
+    Route::post('/approvals/action', [ApprovalRequestController::class, 'action'])->name('approval.action');
 
     Route::get('/approval-requests/{id}/print', [ApprovalPdfController::class, 'print'])->name('approval.print');
 

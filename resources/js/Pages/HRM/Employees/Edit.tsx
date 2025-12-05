@@ -9,17 +9,17 @@ import {
     TabsTrigger,
 } from "@/Components/ui/tabs";
 
-// (1. Import ฟอร์มที่เราแยกไว้)
-import { EmployeeForm } from './Partials/EmployeeForm';
+// Import Components
+import EmployeeForm from './Partials/EmployeeForm';
 import EmergencyContactManager from './Partials/EmergencyContactManager';
 import EmployeeDocumentManager from './Partials/EmployeeDocumentManager';
 import HrmNavigationMenu from '../Partials/HrmNavigationMenu';
 
-// (2. สร้าง Interfaces สำหรับหน้านี้ - คล้ายกับ Index)
+// Interfaces
 interface Company { id: number; name: string; }
 interface Role { id: number; name: string; }
 interface Department { id: number; name: string; company_id: number; }
-interface EmergencyContact { id: number; name: string; relationship: string; phone_number: string; } // (Type ใหม่)
+interface EmergencyContact { id: number; name: string; relationship: string; phone_number: string; }
 interface EmployeeDocument {
     id: number;
     title: string;
@@ -29,25 +29,37 @@ interface EmployeeDocument {
     expires_at: string | null;
     created_at: string;
 }
-interface Employee {
+
+// ✅ อัปเดต Interface ให้ครบถ้วนตามที่ EmployeeForm ต้องการ
+export interface Employee {
     id: number;
     first_name: string;
     last_name: string;
     job_title: string | null;
+    employee_id_no: string | null; // ✅ เพิ่มบรรทัดนี้ (แก้ Error)
+    email: string | null;
+    phone: string | null;
+    address: string | null;
+    hourly_rate: number | null;
+    user_id: number | null;
     user: { id: number; name: string; email: string } | null;
     department: Department | null;
     company?: Company | null;
     join_date?: string;
+    signature_url?: string | null;
     emergency_contacts: EmergencyContact[];
     documents: EmployeeDocument[];
+    department_id: number | null;
+    company_id: number;
 }
+
 interface AuthUser extends User {
     company: Company;
 }
 
 interface EditPageProps extends PageProps {
     auth: { user: AuthUser; };
-    employee: Employee; // (Prop ที่ส่งมาจาก Controller@edit)
+    employee: Employee;
     commonData: {
         departments: Department[];
         unlinkedUsers: User[];
@@ -55,10 +67,8 @@ interface EditPageProps extends PageProps {
     };
 }
 
-// --- (Component หลัก: หน้า Edit) ---
 export default function EmployeeEdit({ auth, employee, commonData }: EditPageProps) {
     return (
-
         <AuthenticatedLayout
             user={auth.user}
             header={
@@ -66,31 +76,29 @@ export default function EmployeeEdit({ auth, employee, commonData }: EditPagePro
                     Edit Employee: {employee.first_name} {employee.last_name}
                 </h2>
             }
-            // (5. [สำคัญ] "เสียบ" เมนูของ BC นี้เข้าไปใน Layout)
             navigationMenu={<HrmNavigationMenu />}
         >
-            <Head title="Edit Employee" />
+            <Head title={`Edit ${employee.first_name} ${employee.last_name}`} />
 
             <div className="py-12">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
 
-                    {/* (4. สร้างโครงสร้างแท็บ) */}
                     <Tabs defaultValue="profile" className="w-full">
                         <TabsList className="grid w-full grid-cols-3">
-                            <TabsTrigger value="profile">Profile</TabsTrigger>
+                            <TabsTrigger value="profile">Profile & Signature</TabsTrigger>
                             <TabsTrigger value="emergency">Emergency Contacts</TabsTrigger>
                             <TabsTrigger value="documents">Documents</TabsTrigger>
                         </TabsList>
 
-                        {/* (แท็บที่ 1: Profile) */}
+                        {/* Tab 1: Profile */}
                         <TabsContent value="profile">
                             <Card>
                                 <CardContent className="p-6">
-                                    <h3 className="font-medium">Employee Profile</h3>
-                                    <p className="text-sm text-muted-foreground mb-4">
-                                        Update the employee's profile information and department.
+                                    <h3 className="text-lg font-medium text-gray-900">Employee Profile</h3>
+                                    <p className="text-sm text-gray-500 mb-6">
+                                        Update profile information, department, and e-signature.
                                     </p>
-                                    {/* (เรียกใช้ EmployeeForm) */}
+
                                     <EmployeeForm
                                         employee={employee}
                                         commonData={commonData}
@@ -100,13 +108,12 @@ export default function EmployeeEdit({ auth, employee, commonData }: EditPagePro
                             </Card>
                         </TabsContent>
 
-                        {/* (แท็บที่ 2: Emergency Contacts) */}
+                        {/* Tab 2: Emergency Contacts */}
                         <TabsContent value="emergency">
-                            {/* (เรียกใช้ Placeholder) */}
                             <EmergencyContactManager employee={employee} />
                         </TabsContent>
 
-                        {/* (4. เพิ่ม) แท็บที่ 3: Documents */}
+                        {/* Tab 3: Documents */}
                         <TabsContent value="documents">
                             <EmployeeDocumentManager employee={employee} />
                         </TabsContent>

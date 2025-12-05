@@ -2,7 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { PageProps, User } from '@/types';
 import { Head, useForm, router, Link } from '@inertiajs/react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/ui/table';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/Components/ui/button';
 import { MoreHorizontal, PlusCircle } from 'lucide-react';
 import Pagination from '@/Components/Pagination';
 import {
@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/Components/ui/card';
-import { EmployeeForm } from './Partials/EmployeeForm';
+import EmployeeForm from './Partials/EmployeeForm';
 import HrmNavigationMenu from '../Partials/HrmNavigationMenu';
 
 // --- 1. สร้าง Type ที่ถูกต้องสำหรับข้อมูลของเรา ---

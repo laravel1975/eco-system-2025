@@ -99,4 +99,18 @@ class ApprovalRequestController extends Controller
             return redirect()->back()->with('error', 'เกิดข้อผิดพลาด: ' . $e->getMessage());
         }
     }
+
+    public function show($id)
+    {
+        $request = ApprovalRequest::with([
+            'workflow',
+            'requester.employeeProfile.position', // ดึงตำแหน่งผู้ขอ
+            'currentStep',
+            'actions.actor.employeeProfile' // ดึงลายเซ็นผู้อนุมัติเก่าๆ
+        ])->findOrFail($id);
+
+        return Inertia::render('Approval/Show', [
+            'request' => $request
+        ]);
+    }
 }
